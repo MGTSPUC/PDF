@@ -45,6 +45,7 @@ body.add .ov{cursor:text}
 .box{position:absolute}
 .txt{width:200px;min-width:70px;min-height:1.4em;padding:3px 5px;border:1px dashed transparent;line-height:1.4;font-family:var(--f);outline:none;overflow:hidden;resize:horizontal;white-space:pre-wrap;word-break:break-word}
 .box:hover .txt,.box.sel .txt{border-color:currentColor}
+.txt[data-bg=frame]{border-color:transparent!important;box-shadow:inset 0 0 0 2px #d92d20}
 .txt:empty::before{content:attr(data-ph);opacity:.45}
 .bar{position:absolute;left:0;top:-21px;height:21px;display:none;align-items:center;gap:4px;padding:0 2px 0 8px;background:#1d1d1b;color:#fff;font-size:11px;border-radius:4px 4px 0 0;cursor:grab;white-space:nowrap;touch-action:none;user-select:none}
 .box:hover .bar,.box.sel .bar{display:flex}
@@ -66,7 +67,7 @@ body.add .ov{cursor:text}
     <option>12</option><option>14</option><option selected>16</option><option>20</option><option>26</option>
   </select>
   <select id="bg" aria-label="พื้นหลังกล่อง">
-    <option value="none" selected>โปร่งใส</option><option value="semi">โปร่งแสง</option><option value="solid">ทึบ</option>
+    <option value="none" selected>โปร่งใส</option><option value="semi">โปร่งแสง</option><option value="solid">ทึบ</option><option value="frame">ทึบ + กรอบแดง</option>
   </select>
   <span class="grow"></span>
   <button id="exp" class="primary" disabled>Export PDF</button>
@@ -82,7 +83,7 @@ body.add .ov{cursor:text}
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const $=s=>document.querySelector(s);
-const BG={none:'transparent',semi:'rgba(255,255,255,.72)',solid:'#ffffff'};
+const BG={none:'transparent',semi:'rgba(255,255,255,.72)',solid:'#ffffff',frame:'#ffffff'};
 let bg='none',bytes=null,fname='',color='#d92d20',size=16,sel=null,dirty=false;
 
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('show'),2500)}
@@ -104,8 +105,9 @@ async function load(file){
       const cv=document.createElement('canvas');cv.width=vp.width*dpr;cv.height=vp.height*dpr;
       cv.style.width=vp.width+'px';cv.style.height=vp.height+'px';
       const ov=document.createElement('div');ov.className='ov';
-      ov.addEventListener('pointerdown',e=>{
+      ov.addEventListener('click',e=>{
         if(e.target!==ov)return;
+        prune();
         if(document.body.classList.contains('add')){addBox(ov,e.offsetX,e.offsetY);setAdd(false)}else select(null)
       });
       pg.append(cv,ov);st.append(pg);
@@ -116,6 +118,8 @@ async function load(file){
   }catch(err){console.error(err);toast('เปิดไฟล์ไม่ได้ (ไฟล์อาจเสียหรือมีรหัสผ่าน)')}
 }
 
+function prune(){document.querySelectorAll('.box').forEach(b=>{const t=b.querySelector('.txt');if(!t.textContent.trim()&&document.activeElement!==t)b.remove()})}
+
 function addBox(ov,x,y){
   const b=document.createElement('div');b.className='box';
   b.style.left=Math.max(0,Math.min(x,ov.clientWidth-210))+'px';b.style.top=Math.max(32,y)+'px';
@@ -124,7 +128,6 @@ function addBox(ov,x,y){
   t.style.color=color;t.style.fontSize=size+'px';t.dataset.bg=bg;t.style.background=BG[bg];
   t.addEventListener('focus',()=>select(b));
   t.addEventListener('input',()=>dirty=true);
-  t.addEventListener('blur',()=>setTimeout(()=>{if(!t.textContent.trim()&&document.activeElement!==t)b.remove()},150));
   bar.querySelector('.x').addEventListener('click',()=>{b.remove();sel=null;dirty=true});
   bar.addEventListener('pointerdown',e=>{
     if(e.target.closest('.x'))return;
@@ -164,6 +167,7 @@ async function exportPdf(){
         const lines=wrap(x,text,mw),h=lines.length*lh;
         const W=t.clientWidth,Hh=h+6;c.width=Math.ceil(W*k);c.height=Math.ceil(Hh*k);
         x.scale(k,k);x.fillStyle=BG[t.dataset.bg||'none'];x.fillRect(0,0,W,Hh);
+        if(t.dataset.bg==='frame'){x.strokeStyle='#d92d20';x.lineWidth=2;x.strokeRect(1,1,W-2,Hh-2)}
         x.font=`${fs}px ${cs.fontFamily}`;x.fillStyle=cs.color;x.textBaseline='middle';
         lines.forEach((l,i)=>x.fillText(l,5,3+i*lh+lh/2));
         const img=await doc.embedPng(c.toDataURL('image/png'));
